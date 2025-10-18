@@ -1,4 +1,6 @@
-﻿package edu.gwu.cs6461.core.util;
+package edu.gwu.cs6461.core.util;
+
 public enum FaultType {
-    ILLEGAL_MEMORY_ADDRESS, ILLEGAL_INSTRUCTION, INVALID_REGISTER, MEMORY_BOUND_ERROR
+    ILLEGAL_MEMORY_ADDRESS,
+    ILLEGAL_INSTRUCTION
 }

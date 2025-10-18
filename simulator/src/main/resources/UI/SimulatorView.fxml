@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<BorderPane xmlns:fx="http://javafx.com/fxml"
+            fx:controller="edu.gwu.cs6461.ui.SimulatorController"
+            prefWidth="980" prefHeight="640">
+
+    <top>
+        <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding:12;">
+            <Button text="IPL (Load)" fx:id="btnIPL" onAction="#onIPL"/>
+            <Button text="Step" fx:id="btnStep" onAction="#onStep"/>
+            <Button text="Run" fx:id="btnRun" onAction="#onRun"/>
+            <Button text="Reset" fx:id="btnReset" onAction="#onReset"/>
+            <Label text="Status:"/>
+            <Label fx:id="status"/>
+        </HBox>
+    </top>
+
+    <center>
+        <GridPane hgap="8" vgap="6" style="-fx-padding:12;">
+            <columnConstraints>
+                <ColumnConstraints percentWidth="10"/>
+                <ColumnConstraints percentWidth="15"/>
+                <ColumnConstraints percentWidth="10"/>
+                <ColumnConstraints percentWidth="15"/>
+                <ColumnConstraints percentWidth="10"/>
+                <ColumnConstraints percentWidth="15"/>
+            </columnConstraints>
+
+            <!-- Row 0 -->
+            <Label text="R0" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+            <TextField fx:id="r0" editable="false" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+            <Label text="R1" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+            <TextField fx:id="r1" editable="false" GridPane.rowIndex="0" GridPane.columnIndex="3"/>
+
+            <Label text="R2" GridPane.rowIndex="0" GridPane.columnIndex="4"/>
+            <TextField fx:id="r2" editable="false" GridPane.rowIndex="0" GridPane.columnIndex="5"/>
+
+            <!-- Row 1 -->
+            <Label text="R3" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+            <TextField fx:id="r3" editable="false" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+            <Label text="X1" GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+            <TextField fx:id="x1" editable="false" GridPane.rowIndex="1" GridPane.columnIndex="3"/>
+
+            <Label text="X2" GridPane.rowIndex="1" GridPane.columnIndex="4"/>
+            <TextField fx:id="x2" editable="false" GridPane.rowIndex="1" GridPane.columnIndex="5"/>
+
+            <!-- Row 2 -->
+            <Label text="X3" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+            <TextField fx:id="x3" editable="false" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+            <Label text="PC" GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+            <TextField fx:id="pc" editable="false" GridPane.rowIndex="2" GridPane.columnIndex="3"/>
+
+            <Label text="IR" GridPane.rowIndex="2" GridPane.columnIndex="4"/>
+            <TextField fx:id="ir" editable="false" GridPane.rowIndex="2" GridPane.columnIndex="5"/>
+
+            <!-- Row 3 -->
+            <Label text="MAR" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+            <TextField fx:id="mar" editable="false" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+            <Label text="MBR" GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+            <TextField fx:id="mbr" editable="false" GridPane.rowIndex="3" GridPane.columnIndex="3"/>
+
+            <Label text="CC" GridPane.rowIndex="3" GridPane.columnIndex="4"/>
+            <TextField fx:id="cc" editable="false" GridPane.rowIndex="3" GridPane.columnIndex="5"/>
+        </GridPane>
+    </center>
+
+    <bottom>
+        <TextArea fx:id="memoryArea" prefRowCount="14"
+                  style="-fx-font-family: 'Consolas'; -fx-padding: 10;"
+                  promptText="Memory dump (first 128 words)"/>
+    </bottom>
+</BorderPane>
