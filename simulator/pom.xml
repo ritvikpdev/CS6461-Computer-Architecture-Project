@@ -58,9 +58,9 @@
         <version>0.0.8</version>
         <configuration>
           <!-- This must match your JavaFX main class -->
-          <mainClass>edu.gwu.cs6461.ui.SimulatorUI</mainClass>
+          <mainClass>edu.gwu.cs6461.ui.GUI</mainClass>
           <!-- Automatically include all JavaFX modules you use -->
-          <launcher>edu.gwu.cs6461.ui.SimulatorUI</launcher>
+          <launcher>edu.gwu.cs6461.ui.GUI</launcher>
           <jlinkZipName>cs6461-simulator</jlinkZipName>
           <stripDebug>true</stripDebug>
         </configuration>
@@ -76,7 +76,7 @@
             <manifest>
               <addClasspath>true</addClasspath>
               <classpathPrefix>lib/</classpathPrefix>
-              <mainClass>edu.gwu.cs6461.ui.SimulatorUI</mainClass>
+              <mainClass>edu.gwu.cs6461.ui.GUI</mainClass>
             </manifest>
           </archive>
         </configuration>

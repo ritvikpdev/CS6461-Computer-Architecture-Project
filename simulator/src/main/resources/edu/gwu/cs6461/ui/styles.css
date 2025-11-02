@@ -1,0 +1,21 @@
+.root {
+    -fx-background-color: #f8f9fa;
+}
+
+.title-label {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+}
+
+.section-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.control-btn {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 4 10;
+    -fx-background-radius: 6;
+}
