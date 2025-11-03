@@ -23,7 +23,30 @@ public class InstructionParser {
         switch(opcode.getCategory()) {
 
             // Format: OP r, x, address[,I]
+            // *** FIX: Special handling for LDX/STX ***
             case "LoadStore":
+                if (mnemonic.equals("LDX") || mnemonic.equals("STX")) {
+                    // Format: OP x, address[,I]
+                    // We store 'x' in the R field, and set IX to 0
+                    R = parseInt(ops[0]); // This is 'x'
+                    IX = 0; // 'x' is not used in the traditional way
+                    if (ops.length > 1) {
+                        addr = parseAddressField(ops[1], symTable);
+                        if (ops.length > 2 || ops[1].endsWith(",I")) I = 1;
+                        if (ops.length > 2 && ops[2].equalsIgnoreCase("I")) I = 1;
+                    }
+                } else {
+                    // Standard Format: OP r, x, address[,I]
+                    R = parseInt(ops[0]);
+                    IX = (ops.length > 1) ? parseInt(ops[1]) : 0;
+                    if (ops.length > 2) {
+                        addr = parseAddressField(ops[2], symTable);
+                        if (ops.length > 3 || ops[2].endsWith(",I")) I = 1;
+                        if (ops.length > 3 && ops[3].equalsIgnoreCase("I")) I = 1;
+                    }
+                }
+                break;
+            
             case "ALU_Mem":
             case "FloatVector":
                 R = parseInt(ops[0]);
@@ -69,7 +92,21 @@ public class InstructionParser {
             // Format: OP rx, ry
             case "ALU_Reg":
                 R = parseInt(ops[0]);  // Mapped to Rx
-                IX = parseInt(ops[1]); // Mapped to Ry
+                
+                // *** FIX ***
+                // NOT is a single-operand instruction
+                if (mnemonic.equals("NOT")) {
+                    IX = 0; // Ry is not used, set to 0
+                } else {
+                    // All other ALU_Reg instructions (TRR, AND, ORR, MLT, DVD)
+                    // require a second operand (Ry)
+                    if (ops.length < 2) {
+                        throw new Exception("Missing second register operand for: " + mnemonic);
+                    }
+                    IX = parseInt(ops[1]); // Mapped to Ry
+                }
+                // *** END FIX ***
+                
                 I = 0; addr = 0;       // Rest are ignored
                 break;
 
@@ -81,11 +118,6 @@ public class InstructionParser {
                 int al = (ops.length > 3) ? parseInt(ops[3]) : 0;
                 
                 // Pack A/L, L/R, and Count into the IX and Address fields
-                // This is a design choice to fit the Instruction.java object.
-                // PassTwo must be aware of this!
-                // A/L -> IX bit 1
-                // L/R -> IX bit 0
-                // Count -> Address field (5 bits, but count is 4 bits)
                 IX = (al << 1) | lr;
                 addr = count;
                 I = 0; // I field is not used
@@ -120,12 +152,9 @@ public class InstructionParser {
      */
     private int parseAddressField(String token, SymbolTable symTable) {
         token = token.trim();
-        // Note: This logic does not handle ,I. That is handled separately.
         
         // Handle indirection (e.g. *LOAD, *10)
         if (token.startsWith("*")) {
-             // This is handled in PassTwo by checking instr.I
-             // Here we just strip it to resolve the address
              token = token.substring(1);
         }
 
@@ -134,3 +163,4 @@ public class InstructionParser {
         return -1; // Unresolved label (PassTwo will handle this)
     }
 }
+

@@ -1,18 +1,17 @@
-LOC 6 ;BEGIN AT LOCATION 6
-Data 10 ;PUT 10 AT LOCATION 6
-Data 3 ;PUT 3 AT LOCATION 7
-Data End ;PUT 1024 AT LOCATION 8
-Data 0
-Data 12
-Data 9
-Data 18
-Data 12
-LDX 2,7 ;X2 GETS 3
-LDR 3,0,10 ;R3 GETS 12
-LDR 2,2,10 ;R2 GETS 12
-LDR 1,2,10,1 ;R1 GETS 18
-LDA 0,0,0 ;R0 GETS 0 to set CONDITION CODE
-LDX 1,8 ;X1 GETS 1024
-JZ 0,1,0 ;JUMP TO End IF R0 = 0
-LOC 1024
-End: HLT ;STOP
+LOC 100
+AMR 1,0,50      ; R1 = R1 + mem[50]
+SMR 2,1,60      ; R2 = R2 - mem[60 + IX1]
+AIR 3,10        ; R3 = R3 + 10
+SIR 0,5         ; R0 = R0 - 5
+
+MLT 0,2         ; R0,R1 = R0,R1 * R2,R3
+DVD 2,0         ; R2,R3 = R2,R3 / R0,R1
+
+TRR 1,2         ; Compare R1 and R2
+AND 0,1,70      ; R0 = R0 AND mem[70 + IX1]
+ORR 2,0,80      ; R2 = R2 OR mem[80]
+NOT 3           ; R3 = NOT R3
+
+SRC 2,3,1,0     ; Shift R2 right arithmetic by 3
+RRC 1,2,0,1     ; Rotate R1 left circular by 2
+END
