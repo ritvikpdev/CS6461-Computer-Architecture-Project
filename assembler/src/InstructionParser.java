@@ -2,6 +2,8 @@ package src;
 
 /**
  * Parses assembly lines into Instruction objects.
+ * This version is updated to handle the specific operand formats
+ * for each instruction category from the C6461 ISA PDF.
  */
 public class InstructionParser {
 
@@ -12,36 +14,97 @@ public class InstructionParser {
         if (opcode == null) throw new Exception("Unknown opcode: " + mnemonic);
 
         int R = 0, IX = 0, I = 0, addr = 0;
-
+        String[] ops = new String[0];
         if (parts.length > 1) {
-            String[] ops = parts[1].replaceAll("\\s*,\\s*", ",").split(",");
-            switch(opcode.getCategory()) {
-                case "LoadStore":
-                case "Transfer":
-                case "ALU":
+            ops = parts[1].replaceAll("\\s*,\\s*", ",").split(",");
+        }
+
+        // Use the opcode category to determine how to parse operands
+        switch(opcode.getCategory()) {
+
+            // Format: OP r, x, address[,I]
+            case "LoadStore":
+            case "ALU_Mem":
+            case "FloatVector":
+                R = parseInt(ops[0]);
+                IX = (ops.length > 1) ? parseInt(ops[1]) : 0;
+                if (ops.length > 2) {
+                    addr = parseAddressField(ops[2], symTable);
+                    if (ops.length > 3 || ops[2].endsWith(",I")) I = 1; // Simple ,I check
+                    if (ops.length > 3 && ops[3].equalsIgnoreCase("I")) I = 1;
+                }
+                break;
+
+            // Format: OP r, x, address[,I] (with exceptions)
+            case "Transfer":
+                if (mnemonic.equals("JMA")) { // Format: OP x, address[,I] (R is ignored)
+                    R = 0; // R field is ignored
+                    IX = (ops.length > 0) ? parseInt(ops[0]) : 0;
+                    if (ops.length > 1) {
+                         addr = parseAddressField(ops[1], symTable);
+                         if (ops.length > 2 || ops[1].endsWith(",I")) I = 1;
+                         if (ops.length > 2 && ops[2].equalsIgnoreCase("I")) I = 1;
+                    }
+                } else if (mnemonic.equals("RFS")) { // Format: OP Immed (Address field)
+                    R = 0; IX = 0; I = 0; // All other fields ignored
+                    if (ops.length > 0) addr = parseInt(ops[0]);
+                } else { // Standard format for JZ, JNE, JCC, JSR, SOB, JGE
                     R = parseInt(ops[0]);
                     IX = (ops.length > 1) ? parseInt(ops[1]) : 0;
                     if (ops.length > 2) {
-                        String addrTok = ops[2];
-                        if (addrTok.startsWith("*")) {
-                            I = 1;
-                            addrTok = addrTok.substring(1);
-                        }
-                        addr = resolveAddress(addrTok, symTable);
+                        addr = parseAddressField(ops[2], symTable);
+                        if (ops.length > 3 || ops[2].endsWith(",I")) I = 1;
+                        if (ops.length > 3 && ops[3].equalsIgnoreCase("I")) I = 1;
                     }
-                    break;
+                }
+                break;
+            
+            // Format: OP r, immed
+            case "ALU_Immed":
+                R = parseInt(ops[0]);
+                IX = 0; I = 0; // IX and I are ignored
+                if (ops.length > 1) addr = parseInt(ops[1]); // Immed goes in Address field
+                break;
 
-                case "Misc":
-                    if (mnemonic.equals("TRAP") && ops.length > 0) {
-                        addr = parseInt(ops[0]); // trap code
-                    }
-                    break;
+            // Format: OP rx, ry
+            case "ALU_Reg":
+                R = parseInt(ops[0]);  // Mapped to Rx
+                IX = parseInt(ops[1]); // Mapped to Ry
+                I = 0; addr = 0;       // Rest are ignored
+                break;
 
-                case "IO":
-                    R = parseInt(ops[0]);
-                    addr = parseInt(ops[1]); // device id
-                    break;
-            }
+            // Format: OP r, count, L/R, A/L
+            case "ShiftRotate":
+                R = parseInt(ops[0]);
+                int count = (ops.length > 1) ? parseInt(ops[1]) : 0;
+                int lr = (ops.length > 2) ? parseInt(ops[2]) : 0;
+                int al = (ops.length > 3) ? parseInt(ops[3]) : 0;
+                
+                // Pack A/L, L/R, and Count into the IX and Address fields
+                // This is a design choice to fit the Instruction.java object.
+                // PassTwo must be aware of this!
+                // A/L -> IX bit 1
+                // L/R -> IX bit 0
+                // Count -> Address field (5 bits, but count is 4 bits)
+                IX = (al << 1) | lr;
+                addr = count;
+                I = 0; // I field is not used
+                break;
+
+            // Format: OP r, devid
+            case "IO":
+                R = parseInt(ops[0]);
+                IX = 0; I = 0; // IX and I are ignored
+                if (ops.length > 1) addr = parseInt(ops[1]); // DevID goes in Address field
+                break;
+            
+            // Format: OP [trapcode]
+            case "Misc":
+                if (mnemonic.equals("TRAP") && ops.length > 0) {
+                    addr = parseInt(ops[0]); // Trap code goes in Address field
+                }
+                // HLT has no operands, all fields remain 0
+                break;
         }
 
         return new Instruction(mnemonic, R, IX, I, addr, line);
@@ -51,9 +114,23 @@ public class InstructionParser {
         return Integer.parseInt(s.trim());
     }
 
-    private int resolveAddress(String token, SymbolTable symTable) {
-        if (token.matches("\\d+")) return Integer.parseInt(token);
-        if (symTable.contains(token)) return symTable.get(token);
-        return -1; // unresolved label
+    /**
+     * Parses an address field that could be an immediate number or a label.
+     * Also handles the indirect flag '*'
+     */
+    private int parseAddressField(String token, SymbolTable symTable) {
+        token = token.trim();
+        // Note: This logic does not handle ,I. That is handled separately.
+        
+        // Handle indirection (e.g. *LOAD, *10)
+        if (token.startsWith("*")) {
+             // This is handled in PassTwo by checking instr.I
+             // Here we just strip it to resolve the address
+             token = token.substring(1);
+        }
+
+        if (token.matches("\\d+")) return Integer.parseInt(token); // It's a number
+        if (symTable.contains(token)) return symTable.get(token); // It's a known label
+        return -1; // Unresolved label (PassTwo will handle this)
     }
 }

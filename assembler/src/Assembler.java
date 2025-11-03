@@ -5,9 +5,9 @@ import java.util.*;
 public class Assembler {
     public static void main(String[] args) {
         try {
-            String inputFile    = "input/source.asm";
-            String listingFile  = "output/listing.txt";  // Figure 4
-            String loadFile     = "output/loadfile.txt"; // Figure 5
+String inputFile    = "CS6461-Computer-Architecture-Project/assembler/input/source.asm";
+String listingFile  = "CS6461-Computer-Architecture-Project/assembler/output/listing.txt";
+String loadFile     = "CS6461-Computer-Architecture-Project/assembler/output/loadfile.txt";
 
             SymbolTable symTable = new SymbolTable();
             PassOne passOne = new PassOne();

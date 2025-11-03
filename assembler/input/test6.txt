@@ -1,5 +1,3 @@
-Directives + Labels (Data Test)
-
 LOC 6
 Data 10
 Data 3

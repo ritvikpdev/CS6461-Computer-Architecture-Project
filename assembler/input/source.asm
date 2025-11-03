@@ -1,10 +1,18 @@
-LOC 50
-JZ  1,0,100     ; Jump if R1 == 0
-JNE 2,1,120     ; Jump if R2 != 0, indexed by IX1
-JCC 0,0,130     ; Jump if condition code set
-JMA 140         ; Unconditional jump
-JSR 150         ; Jump to subroutine
-RFS 3           ; Return from subroutine with return code 3
-SOB 3,0,160     ; Decrement R3 and branch if > 0
-JGE 2,0,170     ; Jump if R2 >= 0
-END
+LOC 6 ;BEGIN AT LOCATION 6
+Data 10 ;PUT 10 AT LOCATION 6
+Data 3 ;PUT 3 AT LOCATION 7
+Data End ;PUT 1024 AT LOCATION 8
+Data 0
+Data 12
+Data 9
+Data 18
+Data 12
+LDX 2,7 ;X2 GETS 3
+LDR 3,0,10 ;R3 GETS 12
+LDR 2,2,10 ;R2 GETS 12
+LDR 1,2,10,1 ;R1 GETS 18
+LDA 0,0,0 ;R0 GETS 0 to set CONDITION CODE
+LDX 1,8 ;X1 GETS 1024
+JZ 0,1,0 ;JUMP TO End IF R0 = 0
+LOC 1024
+End: HLT ;STOP

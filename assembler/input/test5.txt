@@ -1,5 +1,3 @@
-Arithmetic & Logical Instructions: Covers memory, immediate, register-to-register, logical ops, and shift/rotate.
-
 LOC 100
 AMR 1,0,50      ; R1 = R1 + mem[50]
 SMR 2,1,60      ; R2 = R2 - mem[60 + IX1]

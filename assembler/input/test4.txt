@@ -1,5 +1,3 @@
-Transfer Instruction: Tests all branch/jump instructions.
-
 LOC 50
 JZ  1,0,100     ; Jump if R1 == 0
 JNE 2,1,120     ; Jump if R2 != 0, indexed by IX1
