@@ -2,10 +2,11 @@ package edu.gwu.cs6461.core;
 
 /**
  * Holds all processor registers and provides typed getters/setters.
+ * (MODIFIED to safely handle index register 0)
  */
 public class Registers {
     private final int[] GPR = new int[4];
-    private final int[] IXR = new int[3];
+    private final int[] IXR = new int[3]; // Physical registers are still 1-3
     private int PC, IR, MAR, MBR, CC, MFR;
 
     public void reset() {
@@ -19,8 +20,23 @@ public class Registers {
     public void setGPR(int i, int v) { GPR[i] = v & 0xFFFF; }
 
     // ===== Index Registers =====
-    public int getIXR(int i) { return IXR[i - 1] & 0xFFFF; }
-    public void setIXR(int i, int v) { IXR[i - 1] = v & 0xFFFF; }
+    /**
+     * Gets value from Index Register i.
+     * CRITICAL FIX: Returns 0 if i is 0, which matches the ISA spec.
+     */
+    public int getIXR(int i) {
+        if (i == 0) return 0; // 0 indicates no indexing
+        return IXR[i - 1] & 0xFFFF;
+    }
+
+    /**
+     * Sets value for Index Register i.
+     * CRITICAL FIX: Does nothing if i is 0.
+     */
+    public void setIXR(int i, int v) {
+        if (i == 0) return; // Cannot set register 0
+        IXR[i - 1] = v & 0xFFFF;
+    }
 
     // ===== Control Registers =====
     public int getPC() { return PC & 0xFFF; }
@@ -38,6 +54,14 @@ public class Registers {
 
     public int getCC() { return CC & 0xF; }
     public void setCC(int v) { CC = v & 0xF; }
+    // Helper to set a specific condition code bit
+    public void setCCBit(int bit, boolean value) {
+        if (value) {
+            CC |= (1 << bit);
+        } else {
+            CC &= ~(1 << bit);
+        }
+    }
 
     public int getMFR() { return MFR & 0xF; }
     public void setMFR(int v) { MFR = v & 0xF; }
