@@ -1,12 +1,194 @@
-000144   010422         AMR 1,0,50      ; R1 = R1 + mem[50]
-000145   013134         SMR 2,1,60      ; R2 = R2 - mem[60 + IX1]
-000146   015412         AIR 3,10        ; R3 = R3 + 10
-000147   016005         SIR 0,5         ; R0 = R0 - 5
-000150   160200         MLT 0,2         ; R0,R1 = R0,R1 * R2,R3
-000151   163000         DVD 2,0         ; R2,R3 = R2,R3 / R0,R1
-000152   164600         TRR 1,2         ; Compare R1 and R2
-000153   166100         AND 0,1,70      ; R0 = R0 AND mem[70 + IX1]
-000154   171000         ORR 2,0,80      ; R2 = R2 OR mem[80]
-000155   173400         NOT 3           ; R3 = NOT R3
-000156   063103         SRC 2,3,1,0     ; Shift R2 right arithmetic by 3
-000157   064602         RRC 1,2,0,1     ; Rotate R1 left circular by 2
+                      LOC 6
+000006   026040         JMA 0, 0, START
+000007   002030         LDR 0, 0, ZERO    ; result
+000010   002430         LDR 1, 0, ZERO    ; signFlag (1 if '-')
+000011   003030         LDR 2, 0, ZERO    ; seenDigit
+000012   143400         IN 3, 0           ; Read one character
+000013   005426         STR 3, 0, READBUF ; Store char
+000014   021022         JZ 2, 0, RT_CHECK_SIGN
+000015   003426         LDR 3, 0, READBUF
+000016   013417         SMR 3, 0, ASCII_0 ; R3 = char - '0'
+000017   037431         JGE 3, 0, RT_GE_ZERO ; If (char >= '0'), it might be a digit
+000020   021012         JZ 2, 0, RT_LOOP
+000021   026040         JMA 0, 0, RT_DONE
+000022   003426         LDR 3, 0, READBUF
+000023   013420         SMR 3, 0, ASCII_MINUS ; R3 = char - '-'
+000024   021426         JZ 3, 0, RT_SET_NEG   ; If (char == '-'), set sign flag
+000025   026040         JMA 0, 0, RT_DIGIT_CHECK
+000026   002430         LDR 1, 0, ZERO
+000027   014401         AIR 1, 1          ; signFlag = 1
+000030   026040         JMA 0, 0, RT_LOOP
+000031   017412         SIR 3, 10         ; R3 = (char - '0') - 10
+000032   037410         JGE 3, 0, RT_NOT_DIGIT ; If (R3 >= 0), then char > '9'
+000033   015412         AIR 3, 10         ; R3 = (char - '0') -> the digit value
+000034   003030         LDR 2, 0, ZERO
+000035   015001         AIR 2, 1
+000036   005427         STR 3, 0, PRINT_TMP ; save digit
+000037   004026         STR 0, 0, READBUF   ; save R0
+000040   002026         LDR 0, 0, READBUF
+000041   062301         SRC 0, 1, 1, 1    ; R0 = R0 * 2
+000042   004021         STR 0, 0, TEMP_DIFF ; TEMP_DIFF = R0 * 2
+000043   002026         LDR 0, 0, READBUF
+000044   062303         SRC 0, 3, 1, 1    ; R0 = R0 * 8
+000045   010021         AMR 0, 0, TEMP_DIFF ; R0 = (R08) + (R02) = R010
+000046   010027         AMR 0, 0, PRINT_TMP ; R0 = (R0*10) + digit
+000047   026040         JMA 0, 0, RT_LOOP
+000050   021012         JZ 2, 0, RT_LOOP ; Not a digit, but haven't seen one yet
+000051   020414         JZ 1, 0, RT_POS ; If signFlag == 0, jump to end
+000052   172000         NOT 0             ; Two's complement
+000053   014001         AIR 0, 1
+000054   004025         STR 0, 0, TARGET  ; Store final result
+000055   026040         JMA 0, 0, AFTER_TARGET ; Return to main flow
+000056   002030         LDR 0, 0, ZERO    ; result
+000057   002430         LDR 1, 0, ZERO    ; signFlag
+000060   003030         LDR 2, 0, ZERO    ; seenDigit
+000061   143400         IN 3, 0
+000062   005426         STR 3, 0, READBUF
+000063   021031         JZ 2, 0, RC_CHECK_SIGN
+000064   003426         LDR 3, 0, READBUF
+000065   013417         SMR 3, 0, ASCII_0
+000066   037400         JGE 3, 0, RC_GE_ZERO
+000067   021021         JZ 2, 0, RC_LOOP
+000070   026040         JMA 0, 0, RC_DONE
+000071   003426         LDR 3, 0, READBUF
+000072   013420         SMR 3, 0, ASCII_MINUS
+000073   021435         JZ 3, 0, RC_SET_NEG
+000074   026040         JMA 0, 0, RC_DIGIT_CHECK
+000075   002430         LDR 1, 0, ZERO
+000076   014401         AIR 1, 1
+000077   026040         JMA 0, 0, RC_LOOP
+000100   017412         SIR 3, 10
+000101   037417         JGE 3, 0, RC_NOT_DIGIT
+000102   015412         AIR 3, 10
+000103   003030         LDR 2, 0, ZERO
+000104   015001         AIR 2, 1
+000105   005427         STR 3, 0, PRINT_TMP
+000106   004026         STR 0, 0, READBUF
+000107   002026         LDR 0, 0, READBUF
+000110   062301         SRC 0, 1, 1, 1
+000111   004021         STR 0, 0, TEMP_DIFF
+000112   002026         LDR 0, 0, READBUF
+000113   062303         SRC 0, 3, 1, 1
+000114   010021         AMR 0, 0, TEMP_DIFF
+000115   010027         AMR 0, 0, PRINT_TMP
+000116   026040         JMA 0, 0, RC_LOOP
+000117   021021         JZ 2, 0, RC_LOOP
+000120   020423         JZ 1, 0, RC_POS
+000121   172000         NOT 0
+000122   014001         AIR 0, 1
+000123   004031         STR 0, 0, READVAL
+000124   003033         LDR 2, 0, MODE
+000125   021020         JZ 2, 0, AFTER_CAND_LOOP
+000126   003030         LDR 2, 0, ZERO
+000127   005033         STR 2, 0, MODE
+000130   026040         JMA 0, 0, AFTER_CAND_FIRST
+000131   026040         JMA 0, 0, READ_TARGET
+000132   003030         LDR 2, 0, ZERO
+000133   015001         AIR 2, 1
+000134   005033         STR 2, 0, MODE
+000135   026040         JMA 0, 0, READ_CAND
+000136   002031         LDR 0, 0, READVAL
+000137   004023         STR 0, 0, WINNER
+000140   002023         LDR 0, 0, WINNER
+000141   012025         SMR 0, 0, TARGET
+000142   036005         JGE 0, 0, MINPOS0
+000143   172000         NOT 0
+000144   014001         AIR 0, 1
+000145   004022         STR 0, 0, MIN_DIFF
+000146   003030         LDR 2, 0, ZERO
+000147   015023         AIR 2, 19
+000150   005024         STR 2, 0, CNT
+000151   003024         LDR 2, 0, CNT
+000152   021001         JZ 2, 0, COMP_DONE
+000153   017001         SIR 2, 1
+000154   005024         STR 2, 0, CNT
+000155   003030         LDR 2, 0, ZERO
+000156   005033         STR 2, 0, MODE
+000157   026040         JMA 0, 0, READ_CAND
+000160   002031         LDR 0, 0, READVAL
+000161   004027         STR 0, 0, PRINT_TMP ; PRINT_TMP holds current candidate
+000162   002027         LDR 0, 0, PRINT_TMP
+000163   012025         SMR 0, 0, TARGET
+000164   036027         JGE 0, 0, DIFFPOS
+000165   172000         NOT 0
+000166   014001         AIR 0, 1
+000167   004021         STR 0, 0, TEMP_DIFF
+000170   002422         LDR 1, 0, MIN_DIFF
+000171   003021         LDR 2, 0, TEMP_DIFF
+000172   013022         SMR 2, 0, MIN_DIFF  ; R2 = new_diff - min_diff
+000173   037000         JGE 2, 0, NO_UPD  ; if (new_diff >= min_diff), skip
+000174   003021         LDR 2, 0, TEMP_DIFF
+000175   005022         STR 2, 0, MIN_DIFF
+000176   003427         LDR 3, 0, PRINT_TMP
+000177   005423         STR 3, 0, WINNER
+000200   026040         JMA 0, 0, CAND_LOOP
+000201   002023         LDR 0, 0, WINNER
+000202   036011         JGE 0, 0, PW_ABS
+000203   003420         LDR 3, 0, ASCII_MINUS ; Load '-'
+000204   145401         OUT 3, 1          ; Print '-'
+000205   002423         LDR 1, 0, WINNER
+000206   172400         NOT 1
+000207   014401         AIR 1, 1
+000210   026040         JMA 0, 0, PW_ZCHK
+000211   002423         LDR 1, 0, WINNER ; R1 = abs(WINNER)
+000212   012430         SMR 1, 0, ZERO
+000213   022417         JNE 1, 0, PW_FINDPOW
+000214   003417         LDR 3, 0, ASCII_0 ; R1 == 0, so just print '0'
+000215   145401         OUT 3, 1
+000216   000000         HLT
+000217   003030         LDR 2, 0, ZERO
+000220   015001         AIR 2, 1          ; R2 (pow) = 1
+000221   004426         STR 1, 0, READBUF ; READBUF = R1 (abs_val)
+000222   002026         LDR 0, 0, READBUF ; R0 = abs_val
+000223   016012         SIR 0, 10         ; R0 = abs_val - 10
+000224   036026         JGE 0, 0, PW_POW_STEP
+000225   026040         JMA 0, 0, PW_PRINT ; abs_val < 10, so pow is correct
+000226   002026         LDR 0, 0, READBUF
+000227   003430         LDR 3, 0, ZERO
+000230   015412         AIR 3, 10
+000231   162300         DVD 0, 3          ; R0 = abs_val / 10
+000232   004026         STR 0, 0, READBUF ; abs_val = R0
+000233   005027         STR 2, 0, PRINT_TMP
+000234   002027         LDR 0, 0, PRINT_TMP
+000235   062301         SRC 0, 1, 1, 1
+000236   004021         STR 0, 0, TEMP_DIFF
+000237   002027         LDR 0, 0, PRINT_TMP
+000240   062303         SRC 0, 3, 1, 1
+000241   010021         AMR 0, 0, TEMP_DIFF
+000242   004027         STR 0, 0, PRINT_TMP
+000243   003027         LDR 2, 0, PRINT_TMP
+000244   026040         JMA 0, 0, PW_POW_LOOP
+000245   005027         STR 2, 0, PRINT_TMP ; save pow
+000246   004426         STR 1, 0, READBUF   ; save R1 (remainder)
+000247   002026         LDR 0, 0, READBUF
+000250   003027         LDR 2, 0, PRINT_TMP
+000251   162200         DVD 0, 2          ; R0=digit, R2=new_remainder
+000252   004021         STR 0, 0, TEMP_DIFF ; save digit
+000253   005026         STR 2, 0, READBUF   ; save new_remainder
+000254   002426         LDR 1, 0, READBUF   ; R1 = new_remainder
+000255   003027         LDR 2, 0, PRINT_TMP ; reload old pow
+000256   002030         LDR 0, 0, ZERO
+000257   014012         AIR 0, 10
+000260   163000         DVD 2, 0          ; R2 = pow / 10
+000261   002021         LDR 0, 0, TEMP_DIFF
+000262   004027         STR 0, 0, PRINT_TMP
+000263   003417         LDR 3, 0, ASCII_0
+000264   011427         AMR 3, 0, PRINT_TMP
+000265   145401         OUT 3, 1
+000266   013030         SMR 2, 0, ZERO
+000267   023005         JNE 2, 0, PW_PRINT_LOOP
+000270   000000         HLT
+                      LOC 239
+000357   000060   ASCII_0: ASCII_0:     DATA 48
+000360   000055   ASCII_MINUS: ASCII_MINUS: DATA 45
+000361   000000   TEMP_DIFF: TEMP_DIFF:   DATA 0
+000362   000000   MIN_DIFF: MIN_DIFF:    DATA 0
+000363   000000   WINNER: WINNER:      DATA 0
+000364   000000   CNT: CNT:         DATA 0
+000365   000000   TARGET: TARGET:      DATA 0
+000366   000000   READBUF: READBUF:     DATA 0
+000367   000000   PRINT_TMP: PRINT_TMP:   DATA 0
+000370   000000   ZERO: ZERO:        DATA 0
+000371   000000   READVAL: READVAL:     DATA 0
+000372   000000   LINK_SAVE: LINK_SAVE:   DATA 0
+000373   000000   MODE: MODE:        DATA 0

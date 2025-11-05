@@ -10,7 +10,7 @@
   <artifactId>CS6461Simulator</artifactId>
   <version>1.0.0</version>
   <name>CS6461 Basic Machine Simulator</name>
-  <description>GWU CS6461 Project – JavaFX-based simulator</description>
+  <description>GWU CS6461 Project – Swing-based simulator</description>
 
 
   <properties>
@@ -20,19 +20,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
-  <dependencies>
-    <!-- JavaFX Core Libraries -->
-    <dependency>
-      <groupId>org.openjfx</groupId>
-      <artifactId>javafx-controls</artifactId>
-      <version>22.0.2</version>
-    </dependency>
-    <dependency>
-      <groupId>org.openjfx</groupId>
-      <artifactId>javafx-fxml</artifactId>
-      <version>22.0.2</version>
-    </dependency>
-  </dependencies>
+  <!-- No external dependencies required for Swing-based app -->
+  <dependencies/>
 
   <build>
     <plugins>
@@ -51,21 +40,6 @@
         </configuration>
       </plugin>
 
-      <!-- JavaFX Maven Plugin (for mvn javafx:run) -->
-      <plugin>
-        <groupId>org.openjfx</groupId>
-        <artifactId>javafx-maven-plugin</artifactId>
-        <version>0.0.8</version>
-        <configuration>
-          <!-- This must match your JavaFX main class -->
-          <mainClass>edu.gwu.cs6461.ui.GUI</mainClass>
-          <!-- Automatically include all JavaFX modules you use -->
-          <launcher>edu.gwu.cs6461.ui.GUI</launcher>
-          <jlinkZipName>cs6461-simulator</jlinkZipName>
-          <stripDebug>true</stripDebug>
-        </configuration>
-      </plugin>
-
       <!-- JAR Plugin (to build runnable .jar) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -76,7 +50,7 @@
             <manifest>
               <addClasspath>true</addClasspath>
               <classpathPrefix>lib/</classpathPrefix>
-              <mainClass>edu.gwu.cs6461.ui.GUI</mainClass>
+              <mainClass>edu.gwu.cs6461.Main</mainClass>
             </manifest>
           </archive>
         </configuration>
@@ -85,11 +59,6 @@
     </plugins>
   </build>
 
-  <repositories>
-    <repository>
-      <id>openjfx</id>
-      <url>https://maven.openjfx.io/</url>
-    </repository>
-  </repositories>
+  <!-- No external repositories required -->
 
 </project>

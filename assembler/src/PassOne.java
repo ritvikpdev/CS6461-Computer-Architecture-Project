@@ -10,10 +10,7 @@ public class PassOne {
      */
     public List<String[]> firstPass(String inputFile, SymbolTable symTable) throws Exception {
         List<String[]> program = new ArrayList<>();
-        // Make sure to use the correct path. This path assumes your IDE's
-        // working directory is the root "CSA PROJECTCOMPLETE" folder.
-        String fullPath = "CS6461-Computer-Architecture-Project/assembler/input/" + new File(inputFile).getName();
-        BufferedReader br = new BufferedReader(new FileReader(fullPath));
+        BufferedReader br = new BufferedReader(new FileReader(inputFile));
 
         int locctr = 0;
         boolean started = false;
@@ -23,9 +20,8 @@ public class PassOne {
             String line = stripComments(raw).trim();
             if (line.isEmpty()) continue;
 
-            // ------------------------
+         
             // Handle labels
-            // ------------------------
             String label = null;
             if (line.contains(":")) {
                 int idx = line.indexOf(':');
@@ -33,41 +29,45 @@ public class PassOne {
                 line = line.substring(idx + 1).trim();
             }
 
-            // ------------------------
-            // Handle LOC (set address)
-            // ------------------------
-            if (!started) {
-                if (line.toUpperCase().startsWith("LOC")) {
-                    locctr = Integer.parseInt(line.split("\\s+")[1]);
-                    started = true;
-                    if (label != null) symTable.add(label, locctr);
-                    continue;
-                } else {
-                    started = true;
-                }
-            }
-
-            if (label != null) symTable.add(label, locctr);
-
-            // *** START OF FIX ***
-            // If the line is now empty (e.g., it was just a label),
-            // we've already registered the label, so we can skip.
-            if (line.isEmpty()) {
-                continue;
-            }
-            // *** END OF FIX ***
-
+            // Handle LOC first, as it changes locctr 
             String[] tokens = line.split("\\s+");
-            String firstToken = tokens[0].toUpperCase();
-
-            if (firstToken.equals("END")) break;
+            String firstToken = line.isEmpty() ? "" : tokens[0].toUpperCase();
 
             if (firstToken.equals("LOC")) {
                 locctr = Integer.parseInt(tokens[1]);
+                if (!started) {
+                    started = true;
+                }
+                
+                // If there was a label, add it with the NEW locctr
+                if (label != null) {
+                    symTable.add(label, locctr);
+                }
+                
+                // Add to program list but don't increment locctr
                 program.add(new String[]{String.valueOf(locctr), "LOC", line, raw, label});
-                continue;
+                continue; // Move to next line
             }
 
+            // If we are here, it's not a LOC line.
+            // Add any label with the CURRENT locctr.
+            if (label != null) {
+                symTable.add(label, locctr);
+            }
+
+            // If the line was *only* a label, we are done.
+            if (line.isEmpty()) {
+                continue; 
+            }
+            
+            // Handle starting point (if not set by LOC)
+            if (!started) {
+                started = true;
+            }
+
+            if (firstToken.equals("END")) break;
+
+            
             if (firstToken.equalsIgnoreCase("DATA")) {
                 program.add(new String[]{String.valueOf(locctr), "DATA", line, raw, label});
                 locctr++;
@@ -89,3 +89,4 @@ public class PassOne {
         return (idx >= 0) ? s.substring(0, idx) : s;
     }
 }
+
