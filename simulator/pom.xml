@@ -19,8 +19,6 @@
     <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
-
-  <!-- No external dependencies required for Swing-based app -->
   <dependencies/>
 
   <build>
@@ -58,7 +56,5 @@
 
     </plugins>
   </build>
-
-  <!-- No external repositories required -->
 
 </project>

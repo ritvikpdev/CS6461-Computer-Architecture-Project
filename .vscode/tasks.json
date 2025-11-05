@@ -1,0 +1,37 @@
+{
+  // VS Code tasks for building and running the CS6461 simulator
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Simulator (Maven)",
+      "type": "shell",
+      "command": "mvn",
+      "args": ["-q", "clean", "package", "-DskipTests"],
+      "options": {
+        "cwd": "${workspaceFolder}/simulator"
+      },
+      
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Run Simulator (JAR)",
+      "type": "shell",
+      "command": "java",
+      "args": ["-jar", "target/CS6461Simulator-1.0.0.jar"],
+      "options": {
+        "cwd": "${workspaceFolder}/simulator"
+      }
+    },
+    {
+      "label": "Build and Run Simulator",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Build Simulator (Maven)",
+        "Run Simulator (JAR)"
+      ]
+    }
+  ]
+}
