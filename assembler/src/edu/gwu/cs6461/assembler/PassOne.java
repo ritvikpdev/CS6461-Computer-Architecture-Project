@@ -1,4 +1,4 @@
-package src;
+package edu.gwu.cs6461.assembler;
 
 import java.io.*;
 import java.util.*;
@@ -20,7 +20,7 @@ public class PassOne {
             String line = stripComments(raw).trim();
             if (line.isEmpty()) continue;
 
-         
+            
             // Handle labels
             String label = null;
             if (line.contains(":")) {
@@ -89,4 +89,3 @@ public class PassOne {
         return (idx >= 0) ? s.substring(0, idx) : s;
     }
 }
-

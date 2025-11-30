@@ -1,4 +1,4 @@
-package src;
+package edu.gwu.cs6461.assembler;
 
 /**
  * Represents a parsed instruction.

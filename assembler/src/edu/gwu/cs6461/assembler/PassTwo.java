@@ -1,4 +1,4 @@
-package src;
+package edu.gwu.cs6461.assembler;
 
 import java.io.*;
 import java.util.*;
@@ -29,24 +29,29 @@ public class PassTwo {
             }
 
             if (type.equals("DATA")) {
-                String[] parts = line.split("\\s+");
-                String operand = parts[1];
-                int value;
+                // Support multiple comma-separated DATA values on one line
+                String payload = line.substring(line.indexOf(' ') + 1).trim();
+                String[] values = payload.replaceAll("\\s*,\\s*", ",").split(",");
 
-                if (operand.matches("\\d+")) {
-                    value = Integer.parseInt(operand);
-                } else if (symTable.contains(operand)) {
-                    value = symTable.get(operand);
-                } else {
-                    throw new Exception("Undefined symbol in DATA: " + operand);
+                int curAddr = addr;
+                for (String v : values) {
+                    int value;
+                    if (v.matches("\\d+")) {
+                        value = Integer.parseInt(v);
+                    } else if (symTable.contains(v)) {
+                        value = symTable.get(v);
+                    } else {
+                        throw new Exception("Undefined symbol in DATA: " + v);
+                    }
+
+                    String machineOctal = String.format("%06o", value & 0xFFFF);
+                    String addrOctal = String.format("%06o", curAddr);
+
+                    // Write to both files; for listing, keep original source line only for first item
+                    OutputWriter.writeLine(bwListing, addrOctal, machineOctal, sourceLine);
+                    OutputWriter.writeLine(bwLoad, addrOctal, machineOctal, null);
+                    curAddr++;
                 }
-
-                String machineOctal = String.format("%06o", value & 0xFFFF);
-                String addrOctal = String.format("%06o", addr);
-
-                // Write to both files
-                OutputWriter.writeLine(bwListing, addrOctal, machineOctal, sourceLine);
-                OutputWriter.writeLine(bwLoad, addrOctal, machineOctal, null);
                 continue;
             }
 
@@ -160,22 +165,12 @@ public class PassTwo {
         bwLoad.close();
     }
 
-    /**
-     * Converts an integer value to a binary string of a specific bit length.
-     * @param val The integer value.
-     * @param bits The number of bits for the output string.
-     * @return A zero-padded binary string.
-     */
     private String toBits(int val, int bits) {
         String s = Integer.toBinaryString(val & ((1 << bits) - 1));
         while (s.length() < bits) s = "0" + s;
         return s.substring(s.length() - bits); // Ensure it's not too long
     }
 
-    /**
-     * Helper to extract the address token for error reporting.
-     * This is a simple version and assumes the token is the last one.
-     */
     private String extractAddressToken(String original) {
         String[] parts = original.split("\\s+", 2);
         if (parts.length < 2) return "?";

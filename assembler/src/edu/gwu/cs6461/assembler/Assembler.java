@@ -1,13 +1,15 @@
-package src;
+package edu.gwu.cs6461.assembler;
 
 import java.util.*;
 
 public class Assembler {
     public static void main(String[] args) {
         try {
-String inputFile    = "CS6461-Computer-Architecture-Project/assembler/input/source.asm";
-String listingFile  = "CS6461-Computer-Architecture-Project/assembler/output/listing.txt";
-String loadFile     = "CS6461-Computer-Architecture-Project/assembler/output/loadfile.txt";
+            // Base path relative to project root
+            String base = "assembler";
+            String inputFile    = base + "/input/source.asm";
+            String listingFile  = base + "/output/listing.txt";
+            String loadFile     = base + "/output/loadfile.txt";
 
             SymbolTable symTable = new SymbolTable();
             PassOne passOne = new PassOne();
@@ -20,7 +22,7 @@ String loadFile     = "CS6461-Computer-Architecture-Project/assembler/output/loa
             passTwo.secondPass(program, symTable, listingFile, loadFile);
 
             System.out.println("Assembler executed. See:");
-            System.out.println("   Listing file:" + listingFile);
+            System.out.println("   Listing file: " + listingFile);
             System.out.println("   Load file   : " + loadFile);
         } catch (Exception e) {
             e.printStackTrace();

@@ -1,273 +1,257 @@
-; IMPORTANT: Addresses 000000..000005 are machine-reserved. We set LOC 6.
-; This is the "Closest Number Finder" (Program 1)
-; required by the assembler.
-LOC 6
-JMA 0, 0, START
+LOC 6                   ; Begin Program Code at Address 6
 
-; --- Subroutine: READ_TARGET ---
-; Reads a multi-digit character string from IN, parses it to an integer,
-; and stores the result in the TARGET variable.
-READ_TARGET:
-LDR 0, 0, ZERO    ; result
-LDR 1, 0, ZERO    ; signFlag (1 if '-')
-LDR 2, 0, ZERO    ; seenDigit
-RT_LOOP:
-IN 3, 0           ; Read one character
-STR 3, 0, READBUF ; Store char
-; If no digit seen, allow leading '-'
-JZ 2, 0, RT_CHECK_SIGN
-RT_DIGIT_CHECK:
-LDR 3, 0, READBUF
-SMR 3, 0, ASCII_0 ; R3 = char - '0'
-JGE 3, 0, RT_GE_ZERO ; If (char >= '0'), it might be a digit
-; Not a digit: if no digit yet, keep scanning; else finalize
-JZ 2, 0, RT_LOOP
-JMA 0, 0, RT_DONE
-RT_CHECK_SIGN:
-LDR 3, 0, READBUF
-SMR 3, 0, ASCII_MINUS ; R3 = char - '-'
-JZ 3, 0, RT_SET_NEG   ; If (char == '-'), set sign flag
-JMA 0, 0, RT_DIGIT_CHECK
-RT_SET_NEG:
-LDR 1, 0, ZERO
-AIR 1, 1          ; signFlag = 1
-JMA 0, 0, RT_LOOP
-RT_GE_ZERO:
-SIR 3, 10         ; R3 = (char - '0') - 10
-JGE 3, 0, RT_NOT_DIGIT ; If (R3 >= 0), then char > '9'
-AIR 3, 10         ; R3 = (char - '0') -> the digit value
-; seenDigit = 1
-LDR 2, 0, ZERO
-AIR 2, 1
-; Accumulate: R0 = R010 + digit (x10 via 8+2)
-STR 3, 0, PRINT_TMP ; save digit
-STR 0, 0, READBUF   ; save R0
-LDR 0, 0, READBUF
-SRC 0, 1, 1, 1    ; R0 = R0 * 2
-STR 0, 0, TEMP_DIFF ; TEMP_DIFF = R0 * 2
-LDR 0, 0, READBUF
-SRC 0, 3, 1, 1    ; R0 = R0 * 8
-AMR 0, 0, TEMP_DIFF ; R0 = (R08) + (R02) = R010
-AMR 0, 0, PRINT_TMP ; R0 = (R0*10) + digit
-JMA 0, 0, RT_LOOP
-RT_NOT_DIGIT:
-JZ 2, 0, RT_LOOP ; Not a digit, but haven't seen one yet
-RT_DONE:
-; Apply sign
-JZ 1, 0, RT_POS ; If signFlag == 0, jump to end
-NOT 0             ; Two's complement
-AIR 0, 1
-RT_POS:
-STR 0, 0, TARGET  ; Store final result
-JMA 0, 0, AFTER_TARGET ; Return to main flow
+; ==========================================================
+; INITIALIZATION SECTION
+; ==========================================================
+INIT:
+LDX 1, PARA_PTR     ; X1 points to start of Paragraph
+LDA 0, 0, 0         ; Clear R0
 
-; --- Subroutine: READ_CAND ---
-; Reads a candidate number. Stores result in READVAL.
-; Jumps to AFTER_CAND_FIRST if MODE=1, or AFTER_CAND_LOOP if MODE=0
-READ_CAND:
-LDR 0, 0, ZERO    ; result
-LDR 1, 0, ZERO    ; signFlag
-LDR 2, 0, ZERO    ; seenDigit
-RC_LOOP:
-IN 3, 0
-STR 3, 0, READBUF
-JZ 2, 0, RC_CHECK_SIGN
-RC_DIGIT_CHECK:
-LDR 3, 0, READBUF
-SMR 3, 0, ASCII_0
-JGE 3, 0, RC_GE_ZERO
-JZ 2, 0, RC_LOOP
-JMA 0, 0, RC_DONE
-RC_CHECK_SIGN:
-LDR 3, 0, READBUF
-SMR 3, 0, ASCII_MINUS
-JZ 3, 0, RC_SET_NEG
-JMA 0, 0, RC_DIGIT_CHECK
-RC_SET_NEG:
-LDR 1, 0, ZERO
-AIR 1, 1
-JMA 0, 0, RC_LOOP
-RC_GE_ZERO:
-SIR 3, 10
-JGE 3, 0, RC_NOT_DIGIT
-AIR 3, 10
-LDR 2, 0, ZERO
-AIR 2, 1
-STR 3, 0, PRINT_TMP
-STR 0, 0, READBUF
-LDR 0, 0, READBUF
-SRC 0, 1, 1, 1
-STR 0, 0, TEMP_DIFF
-LDR 0, 0, READBUF
-SRC 0, 3, 1, 1
-AMR 0, 0, TEMP_DIFF
-AMR 0, 0, PRINT_TMP
-JMA 0, 0, RC_LOOP
-RC_NOT_DIGIT:
-JZ 2, 0, RC_LOOP
-RC_DONE:
-JZ 1, 0, RC_POS
-NOT 0
-AIR 0, 1
-RC_POS:
-STR 0, 0, READVAL
-; Dispatch return based on MODE: 1 -> first-candidate init, 0 -> loop
-LDR 2, 0, MODE
-JZ 2, 0, AFTER_CAND_LOOP
-; MODE==1 -> clear MODE and go to first-candidate return
-LDR 2, 0, ZERO
-STR 2, 0, MODE
-JMA 0, 0, AFTER_CAND_FIRST
+; ==========================================================
+; PART 1: PRINT THE PARAGRAPH
+; ==========================================================
+PRINT_LOOP:
+LDR 0, 1, 0         ; Load char from Paragraph (X1) into R0
+JZ  0, 0, INPUT_INIT ; If char is 0 (NULL terminator), done printing
+OUT 0, 1            ; Output char to Printer (DevID 1)
 
-; === Main ===
-START:
-; Read TARGET first
-JMA 0, 0, READ_TARGET
-AFTER_TARGET:
-; Read first candidate -> initialize WINNER/MIN_DIFF
-; Indicate first-candidate return path via MODE=1
-LDR 2, 0, ZERO
-AIR 2, 1
-STR 2, 0, MODE
-JMA 0, 0, READ_CAND
-AFTER_CAND_FIRST:
-LDR 0, 0, READVAL
-STR 0, 0, WINNER
-LDR 0, 0, WINNER
-SMR 0, 0, TARGET
-JGE 0, 0, MINPOS0
-NOT 0
-AIR 0, 1
-MINPOS0:
-STR 0, 0, MIN_DIFF
-; Set CNT = 19 remaining (since we already processed 1st)
-LDR 2, 0, ZERO
-AIR 2, 19
-STR 2, 0, CNT
-; Loop remaining 19 candidates
-CAND_LOOP:
-LDR 2, 0, CNT
-JZ 2, 0, COMP_DONE
-SIR 2, 1
-STR 2, 0, CNT
-; Ensure MODE=0 for loop returns
-LDR 2, 0, ZERO
-STR 2, 0, MODE
-JMA 0, 0, READ_CAND
-AFTER_CAND_LOOP:
-LDR 0, 0, READVAL
-STR 0, 0, PRINT_TMP ; PRINT_TMP holds current candidate
-; diff = |cand - TARGET|
-LDR 0, 0, PRINT_TMP
-SMR 0, 0, TARGET
-JGE 0, 0, DIFFPOS
-NOT 0
-AIR 0, 1
-DIFFPOS:
-STR 0, 0, TEMP_DIFF
-; if diff < MIN_DIFF -> update MIN_DIFF and WINNER
-LDR 1, 0, MIN_DIFF
-LDR 2, 0, TEMP_DIFF
-SMR 2, 0, MIN_DIFF  ; R2 = new_diff - min_diff
-JGE 2, 0, NO_UPD  ; if (new_diff >= min_diff), skip
-; Update MIN_DIFF and WINNER (PRINT_TMP still holds this candidate)
-LDR 2, 0, TEMP_DIFF
-STR 2, 0, MIN_DIFF
-LDR 3, 0, PRINT_TMP
-STR 3, 0, WINNER
-NO_UPD:
-JMA 0, 0, CAND_LOOP
+; Increment X1 (Paragraph Pointer)
+; Logic: Store X1 -> Load to GPR -> Add 1 -> Store back -> Load X1
+STX 1, TEMP_X
+LDR 3, 0, TEMP_X
+AIR 3, 1
+STR 3, 0, TEMP_X
+LDX 1, TEMP_X
 
-; --- Subroutine: Print WINNER as multi-digit decimal with sign ---
-COMP_DONE:
-; R1 holds |WINNER|, R2=pow, R0 temp
-LDR 0, 0, WINNER
-JGE 0, 0, PW_ABS
-LDR 3, 0, ASCII_MINUS ; Load '-'
-OUT 3, 1          ; Print '-'
-LDR 1, 0, WINNER
-NOT 1
-AIR 1, 1
-JMA 0, 0, PW_ZCHK
-PW_ABS:
-LDR 1, 0, WINNER ; R1 = abs(WINNER)
-PW_ZCHK:
-SMR 1, 0, ZERO
-JNE 1, 0, PW_FINDPOW
-LDR 3, 0, ASCII_0 ; R1 == 0, so just print '0'
+JMA 0, PRINT_LOOP   ; Loop back
+
+
+; ==========================================================
+; PART 2: ASK USER FOR SEARCH WORD
+; ==========================================================
+INPUT_INIT:
+LDX 2, WORD_PTR     ; X2 points to Search Word Buffer
+
+; Print "Enter Word: " (ASCII codes omitted for brevity, implied functionality)
+
+
+READ_LOOP:
+IN 0, 0             ; Input from Keyboard (DevID 0) to R0
+OUT 0, 1            ; Echo input to Printer
+
+; Check for Enter Key (Newline = 13 or 10)
+STR 0, 0, TEMP_CHAR ; Store input to temp for comparison
+LDX 3, ENTER_KEY    ; Load address of Enter Key constant
+SMR 0, 3, 0         ; R0 = R0 - 13
+JZ  0, 0, SEARCH_SETUP ; If Enter pressed, start search
+
+; Store char in buffer
+LDR 0, 0, TEMP_CHAR ; Reload original char
+STR 0, 2, 0         ; Store R0 into Word Buffer (X2)
+
+; Increment X2 (Word Buffer Pointer)
+STX 2, TEMP_X
+LDR 3, 0, TEMP_X
+AIR 3, 1
+STR 3, 0, TEMP_X
+LDX 2, TEMP_X
+
+JMA 0, READ_LOOP    ; Continue reading
+
+
+; ==========================================================
+; PART 3: SEARCH LOGIC
+; ==========================================================
+SEARCH_SETUP:
+; Terminate the Search Word buffer with NULL
+LDA 0, 0, 0
+STR 0, 2, 0
+
+; Reset Pointers and Counters
+LDX 1, PARA_PTR     ; X1 = Paragraph Start
+LDA 2, 1, 0         ; R2 = Sentence Counter (Start at 1)
+LDA 3, 1, 0         ; R3 = Word Counter (Start at 1)
+
+
+SEARCH_MAIN_LOOP:
+LDR 0, 1, 0         ; Load Paragraph Char
+JZ  0, 0, NOT_FOUND ; If NULL, end of text, word not found
+
+; --- Update Counters ---
+
+; Check for Period (Sentence End)
+STR 0, 0, TEMP_CHAR
+LDX 0, PERIOD_KEY   ; Load Period Constant Address
+LDR 1, 0, TEMP_CHAR ; Reload char
+SMR 1, 0, 0         ; Compare
+JZ  1, 0, INC_SENT  ; If '.', go to increment sentence
+
+; Check for Space (Word End)
+LDR 1, 0, TEMP_CHAR
+LDX 0, SPACE_KEY
+SMR 1, 0, 0
+JZ  1, 0, INC_WORD  ; If ' ', go to increment word
+
+; --- Check for Word Match ---
+; Compare current Para char with FIRST char of Search Word
+LDR 1, 0, TEMP_CHAR
+LDX 2, WORD_PTR     ; X2 = Start of Search Word
+LDR 0, 2, 0         ; Load 1st char of Search Word
+
+; Pseudo-Compare: R1 (Para) - R0 (Word)
+STR 0, 0, TEMP_COMP ; Store Word char to temp
+SMR 1, 0, TEMP_COMP ; Subtract
+JZ  1, 0, CHECK_FULL ; If first char matches, check full word
+
+JMA 0, NEXT_CHAR    ; Otherwise, move to next char
+
+
+INC_SENT:
+AIR 2, 1            ; Sentence Count ++
+LDA 3, 1, 0         ; Reset Word Count to 1
+JMA 0, NEXT_CHAR
+
+INC_WORD:
+AIR 3, 1            ; Word Count ++
+JMA 0, NEXT_CHAR
+
+; ==========================================================
+; CHECK FULL WORD SUBROUTINE (Unrolled Logic)
+; ==========================================================
+CHECK_FULL:
+; We are here because Para[X1] matched Word[0].
+; Now check Para[X1+1] == Word[1], etc.
+; Save current X1 so we don't lose our place if it fails
+STX 1, SAVE_X1
+STX 2, SAVE_X2      ; X2 is currently at Word start
+
+CHECK_LOOP:
+; Inc X1 and X2 to check next chars
+; (Increment X1)
+STX 1, TEMP_X
+LDR 0, 0, TEMP_X
+AIR 0, 1
+STR 0, 0, TEMP_X
+LDX 1, TEMP_X
+
+; (Increment X2)
+STX 2, TEMP_X
+LDR 0, 0, TEMP_X
+AIR 0, 1
+STR 0, 0, TEMP_X
+LDX 2, TEMP_X
+
+; Load chars
+LDR 0, 1, 0         ; Next Para Char
+LDR 1, 2, 0         ; Next Word Char
+
+; If Word Char is NULL, we reached end of search word -> MATCH SUCCESS!
+JZ  1, 0, FOUND_MATCH
+
+; If Para Char is NULL but Word isn't -> Fail
+JZ  0, 0, RESET_SEARCH
+
+; Compare
+STR 1, 0, TEMP_COMP
+SMR 0, 0, TEMP_COMP
+JZ  0, 0, CHECK_LOOP ; If equal, keep checking
+
+; If not equal, fall through to RESET_SEARCH
+
+
+RESET_SEARCH:
+LDX 1, SAVE_X1      ; Restore X1 to where we started checking
+LDX 2, WORD_PTR     ; Restore X2
+JMA 0, NEXT_CHAR
+
+; ==========================================================
+; NEXT CHAR & FOUND LOGIC
+; ==========================================================
+NEXT_CHAR:
+; Increment X1 Main Pointer
+STX 1, TEMP_X
+LDR 0, 0, TEMP_X
+AIR 0, 1
+STR 0, 0, TEMP_X
+LDX 1, TEMP_X
+JMA 0, SEARCH_MAIN_LOOP
+
+FOUND_MATCH:
+; Print "FOUND: "
+LDX 2, STR_FOUND
+JSR 0, PRINT_STR
+
+; Print Search Word (from Buffer)
+LDX 2, WORD_PTR
+JSR 0, PRINT_STR
+
+; Print " SENTENCE: "
+LDX 2, STR_SENT
+JSR 0, PRINT_STR
+
+; Print Sentence Count (R2) - Needs conversion to ASCII
+; (Simplified: Assuming single digit 0-9. Add 48 to convert to ASCII)
+AIR 2, 48
+OUT 2, 1
+
+; Print " WORD: "
+LDX 2, STR_WORD
+JSR 0, PRINT_STR
+
+; Print Word Count (R3)
+AIR 3, 48
 OUT 3, 1
+
+HLT                 ; End Program
+
+
+NOT_FOUND:
+LDX 2, STR_NOTFOUND
+JSR 0, PRINT_STR
 HLT
 
-; Find highest power of 10
-PW_FINDPOW:
-LDR 2, 0, ZERO
-AIR 2, 1          ; R2 (pow) = 1
-STR 1, 0, READBUF ; READBUF = R1 (abs_val)
-PW_POW_LOOP:
-LDR 0, 0, READBUF ; R0 = abs_val
-SIR 0, 10         ; R0 = abs_val - 10
-JGE 0, 0, PW_POW_STEP
-JMA 0, 0, PW_PRINT ; abs_val < 10, so pow is correct
-PW_POW_STEP:
-LDR 0, 0, READBUF
-LDR 3, 0, ZERO
-AIR 3, 10
-DVD 0, 3          ; R0 = abs_val / 10
-STR 0, 0, READBUF ; abs_val = R0
-; R2 = R2 * 10
-STR 2, 0, PRINT_TMP
-LDR 0, 0, PRINT_TMP
-SRC 0, 1, 1, 1
-STR 0, 0, TEMP_DIFF
-LDR 0, 0, PRINT_TMP
-SRC 0, 3, 1, 1
-AMR 0, 0, TEMP_DIFF
-STR 0, 0, PRINT_TMP
-LDR 2, 0, PRINT_TMP
-JMA 0, 0, PW_POW_LOOP
+; ==========================================================
+; UTILS & DATA
+; ==========================================================
+PRINT_STR:
+; Prints string pointed to by X2
+LDR 0, 2, 0
+JZ  0, 0, RFS_RET
+OUT 0, 1
+; Inc X2
+STX 2, TEMP_X2
+LDR 0, 0, TEMP_X2
+AIR 0, 1
+STR 0, 0, TEMP_X2
+LDX 2, TEMP_X2
+JMA 0, PRINT_STR
+RFS_RET:
+RFS 0               ; Return from Subroutine (R0=Link)
 
-; Print loop:
-PW_PRINT:
-; R2 still holds the correct power from PW_FINDPOW.
-PW_PRINT_LOOP:
-STR 2, 0, PRINT_TMP ; save pow
-STR 1, 0, READBUF   ; save R1 (remainder)
-LDR 0, 0, READBUF
-LDR 2, 0, PRINT_TMP
-DVD 0, 2          ; R0=digit, R2=new_remainder
-STR 0, 0, TEMP_DIFF ; save digit
-STR 2, 0, READBUF   ; save new_remainder
-LDR 1, 0, READBUF   ; R1 = new_remainder
-; pow = pow / 10
-LDR 2, 0, PRINT_TMP ; reload old pow
-LDR 0, 0, ZERO
-AIR 0, 10
-DVD 2, 0          ; R2 = pow / 10
-; print the saved digit
-LDR 0, 0, TEMP_DIFF
-STR 0, 0, PRINT_TMP
-LDR 3, 0, ASCII_0
-AMR 3, 0, PRINT_TMP
-OUT 3, 1
-; Continue if pow != 0
-SMR 2, 0, ZERO
-JNE 2, 0, PW_PRINT_LOOP
-HLT
+; DATA STORAGE
+TEMP_X:      Data 0
+TEMP_X2:     Data 0
+TEMP_CHAR:   Data 0
+TEMP_COMP:   Data 0
+SAVE_X1:     Data 0
+SAVE_X2:     Data 0
 
-; --- Data ---
-LOC 239
-ASCII_0:     DATA 48
-ASCII_MINUS: DATA 45
-TEMP_DIFF:   DATA 0
-MIN_DIFF:    DATA 0
-WINNER:      DATA 0
-CNT:         DATA 0
-TARGET:      DATA 0
-READBUF:     DATA 0
-PRINT_TMP:   DATA 0
-ZERO:        DATA 0
-READVAL:     DATA 0
-LINK_SAVE:   DATA 0
-MODE:        DATA 0
+ENTER_KEY:   Data 13    ; CR
+PERIOD_KEY:  Data 46    ; .
+SPACE_KEY:   Data 32    ; Space
 
-END
+PARA_PTR:    Data 1000
+WORD_PTR:    Data 2000
+
+STR_FOUND:   Data 70, 79, 85, 78, 68, 58, 32, 0         ; "FOUND: "
+STR_SENT:    Data 32, 83, 69, 78, 84, 58, 32, 0         ; " SENT: "
+STR_WORD:    Data 32, 87, 79, 82, 68, 58, 32, 0         ; " WORD: "
+STR_NOTFOUND: Data 78, 79, 84, 32, 70, 79, 85, 78, 68, 0 ; "NOT FOUND"
+
+; Pointers for strings
+LOC 1000
+; "The cat. The dog. It ran. Sun hot. Sky blue. The End."
+Data 84, 104, 101, 32, 99, 97, 116, 46, 32, 84, 104, 101, 32, 100, 111, 103, 46, 32, 73, 116, 32, 114, 97, 110, 46, 32, 83, 117, 110, 32, 104, 111, 116, 46, 32, 83, 107, 121, 32, 98, 108, 117, 101, 46, 32, 84, 104, 101, 32, 69, 110, 100, 46, 0
+
+LOC 2000
+Data 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ; Reserve space for input
