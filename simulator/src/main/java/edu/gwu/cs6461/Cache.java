@@ -1,141 +1,129 @@
 package edu.gwu.cs6461;
 
+import java.util.LinkedList;
+import java.util.Queue;
+
 /**
- * A simple, 16-line, fully associative cache for the C6461 CPU.
- * Uses a FIFO (First-In, First-Out) replacement policy.
- * Uses a Write-Through (and Write-Around) policy:
- * - Write-Through: Writes go to both cache (if hit) and main memory.
- * - Write-Around (No-Write-Allocate): A write miss does NOT load the block into cache.
+ * Implements a fully associative cache with FIFO replacement policy.
+ * Cache specifications:
+ * - 16 cache lines
+ * - Fully associative
+ * - FIFO replacement policy
+ * - Write-through policy
+ * - Unified cache (stores both instructions and data)
  */
 public class Cache {
+    public static final int CACHE_SIZE = 16;
+    private CacheLine[] lines;
+    private Queue<Integer> fifoQueue;  // Queue for FIFO replacement policy
 
     /**
-     * Inner class representing a single line in the cache.
+     * Represents a single cache line with tag, valid bit, and data.
      */
-    private static class CacheLine {
-        short tag;    // For fully associative, the tag is the full memory address.
-        short data;   // The 16-bit data word stored in this line.
-        boolean valid;
-
-        CacheLine() {
+    public static class CacheLine {
+        private int tag;           // Memory address tag
+        private boolean valid;     // Valid bit
+        private short data;        // 16-bit word data
+        
+        public CacheLine() {
             this.valid = false;
+            this.tag = 0;
+            this.data = 0;
         }
+
+        public String toString() {
+            return String.format("Tag: %04X, Valid: %b, Data: %04X", tag, valid, data & 0xFFFF);
+        }
+
+        // Getters and setters
+        public int getTag() { return tag; }
+        public boolean isValid() { return valid; }
+        public short getData() { return data; }
+        public void setTag(int tag) { this.tag = tag; }
+        public void setValid(boolean valid) { this.valid = valid; }
+        public void setData(short data) { this.data = data; }
     }
 
-    private final CacheLine[] lines;
-    private final short[] mainMemory; // A direct reference to the CPU's main memory.
-    private final SimulatorGUI gui; // For logging hits and misses.
-    private final Utils utils;
-    private int fifoPointer; // Points to the next line to be replaced (FIFO).
-
-    private static final int CACHE_SIZE = 16;
-
-    public Cache(short[] mainMemory, SimulatorGUI gui, Utils utils) {
-        this.mainMemory = mainMemory;
-        this.gui = gui;
-        this.utils = utils;
-        this.lines = new CacheLine[CACHE_SIZE];
+    public Cache() {
+        lines = new CacheLine[CACHE_SIZE];
         for (int i = 0; i < CACHE_SIZE; i++) {
             lines[i] = new CacheLine();
         }
-        this.fifoPointer = 0;
+        fifoQueue = new LinkedList<>();
     }
 
     /**
-     * Reads a word from a given memory address.
-     * Checks cache first. On miss, fetches from main memory and loads into cache.
-     *
-     * @param address The 11-bit memory address to read from.
-     * @return The 16-bit data word.
+     * Reads data from cache. Returns null if cache miss.
+     * @param address Memory address to read from
+     * @return Data if cache hit, null if cache miss
      */
-    public short read(short address) {
-        short tag = address;
+    public Short read(int address) {
+        for (CacheLine line : lines) {
+            if (line.isValid() && line.getTag() == address) {
+                return line.getData(); // Cache hit
+            }
+        }
+        return null; // Cache miss
+    }
 
-        // 1. Check for Cache Hit
+    /**
+     * Writes data to cache using write-through policy.
+     * @param address Memory address
+     * @param data Data to write
+     * @return Index where data was written
+     */
+    public int write(int address, short data) {
+        // First, check if address already exists in cache
         for (int i = 0; i < CACHE_SIZE; i++) {
-            if (lines[i].valid && lines[i].tag == tag) {
-                gui.appendToPrinter("-> CACHE HIT (Read) @ " + utils.shortToOctal(address, 4));
-                return lines[i].data;
+            if (lines[i].isValid() && lines[i].getTag() == address) {
+                lines[i].setData(data);
+                return i;
             }
         }
 
-        // 2. Cache Miss
-        gui.appendToPrinter("-> CACHE MISS (Read) @ " + utils.shortToOctal(address, 4));
-        
-        // 3. Fetch from Main Memory
-        short dataFromMem = mainMemory[address];
+        // If not found, need to find a spot or replace
+        int index = findEmptyLine();
+        if (index == -1) {
+            // No empty line, use FIFO replacement
+            index = fifoQueue.remove();
+        }
 
-        // 4. Load into Cache (FIFO Replacement)
-        gui.appendToPrinter("   (Loading mem[" + utils.shortToOctal(address, 4) + "] into cache line " + fifoPointer + ")");
-        lines[fifoPointer].valid = true;
-        lines[fifoPointer].tag = tag;
-        lines[fifoPointer].data = dataFromMem;
+        lines[index].setTag(address);
+        lines[index].setValid(true);
+        lines[index].setData(data);
+        fifoQueue.offer(index);
 
-        // 5. Move FIFO pointer
-        fifoPointer = (fifoPointer + 1) % CACHE_SIZE;
-
-        return dataFromMem;
+        return index;
     }
 
     /**
-     * Writes a word to a given memory address using a Write-Through policy.
-     *
-     * @param address The 11-bit memory address to write to.
-     * @param data The 16-bit data word to write.
+     * Finds an empty cache line.
+     * @return Index of empty line, or -1 if none available
      */
-    public void write(short address, short data) {
-        short tag = address;
-        
-        // 1. Write-Through: Always write data to main memory.
-        mainMemory[address] = data;
-
-        // 2. Check if the block is in the cache (Cache Hit)
+    private int findEmptyLine() {
         for (int i = 0; i < CACHE_SIZE; i++) {
-            if (lines[i].valid && lines[i].tag == tag) {
-                // 3a. Cache Hit: Update the data in the cache as well.
-                gui.appendToPrinter("-> CACHE HIT (Write) @ " + utils.shortToOctal(address, 4));
-                lines[i].data = data;
-                return;
+            if (!lines[i].isValid()) {
+                return i;
             }
         }
-
-        // 3b. Cache Miss (Write-Around): Do nothing. The block is not loaded on a write miss.
-        gui.appendToPrinter("-> CACHE MISS (Write) @ " + utils.shortToOctal(address, 4) + ". (Write-Through only)");
+        return -1;
     }
 
     /**
-     * Invalidates all lines in the cache.
-     * Called during IPL or Reset.
+     * Gets all cache lines for display purposes.
+     * @return Array of cache lines
      */
-    public void invalidate() {
-        for (int i = 0; i < CACHE_SIZE; i++) {
-            lines[i].valid = false;
-        }
-        fifoPointer = 0;
-        gui.appendToPrinter("Cache invalidated.");
+    public CacheLine[] getLines() {
+        return lines;
     }
 
     /**
-     * Generates a formatted string representing the current state of the cache.
-     *
-     * @return A string for display in the GUI.
+     * Clears the cache (invalidates all lines).
      */
-    public String getFormattedCache() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("FIFO Pointer -> Line %d\n", fifoPointer));
-        sb.append("----------------------------------\n");
-        sb.append("LN | V | TAG (OCT) | DATA (OCT)\n");
-        sb.append("----------------------------------\n");
-
-        for (int i = 0; i < CACHE_SIZE; i++) {
-            CacheLine line = lines[i];
-            sb.append(String.format("%02d | %s | %-9s | %-10s\n",
-                    i,
-                    line.valid ? "1" : "0",
-                    line.valid ? utils.shortToOctal(line.tag, 4) : "-",
-                    line.valid ? utils.shortToOctal(line.data, 6) : "-"
-            ));
+    public void clear() {
+        for (CacheLine line : lines) {
+            line.setValid(false);
         }
-        return sb.toString();
+        fifoQueue.clear();
     }
 }

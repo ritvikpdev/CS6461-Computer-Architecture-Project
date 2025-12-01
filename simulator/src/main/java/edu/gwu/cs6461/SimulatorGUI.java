@@ -6,7 +6,10 @@ import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.io.File;
+import java.io.IOException;
 import java.awt.event.ActionListener;
+import java.util.LinkedList;
+import java.util.Queue;
 
 /**
  * The main Graphical User Interface for the CSCI 6461 Machine Simulator.
@@ -21,7 +24,16 @@ public class SimulatorGUI extends JFrame {
     private static final Font FONT_BUTTON = new Font("SansSerif", Font.BOLD, 12);
     // ============================
 
+    private final Memory memory;
     private final CPU cpu;
+    private final Queue<String> consoleInputQueue = new LinkedList<>();
+    
+    // Enhanced controller logic
+    private StringBuilder printerBuffer = new StringBuilder();
+    private int inputsConsumedThisRun = 0;
+    private boolean waitingForInputAnnounced = false;
+    private boolean summaryPrinted = false;
+    private boolean program2Mode = false;
 
     // GUI Components
     private final JTextField[] gprTextFields = new JTextField[4];
@@ -39,9 +51,16 @@ public class SimulatorGUI extends JFrame {
     private final JTextField consoleInputTextField = new JTextField(60);
 
     public SimulatorGUI() {
-        this.cpu = new CPU(this);
+        // Initialize memory and CPU with proper architecture
+        this.memory = new Memory();
+        this.cpu = new CPU(memory);
+        
+        // Wire up I/O suppliers and consumers
+        cpu.setConsoleInputSupplier(this::readFromConsole);
+        
+        cpu.setPrinterConsumer(text -> printToConsole(text));
 
-        // --- NEW: Set Native Look and Feel ---
+        // --- Set Native Look and Feel ---
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
@@ -51,19 +70,19 @@ public class SimulatorGUI extends JFrame {
 
         setTitle("CSCI 6461 Machine Simulator");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setResizable(true); // Allow resizing
-        setLayout(new BorderLayout(5, 5)); // Use BorderLayout
+        setResizable(true);
+        setLayout(new BorderLayout(5, 5));
         getContentPane().setBackground(COLOR_BACKGROUND);
 
         setupComponents();
         addListeners();
 
-        setMinimumSize(new Dimension(1024, 768)); // Set a reasonable minimum size
+        setMinimumSize(new Dimension(1024, 768));
         pack();
         setLocationRelativeTo(null);
-        cpu.resetMachine(); // Perform initial reset on startup
+        resetMachine();
         updateAllDisplays();
-        cacheContentArea.setText(""); // Clear cache content on startup
+        cacheContentArea.setText("");
     }
 
     private void setupComponents() {
@@ -459,20 +478,61 @@ public class SimulatorGUI extends JFrame {
                 }
             } catch (Exception ignored) { /* safe to ignore */ }
             printerArea.append(text + "\n");
+            printerBuffer.append(text).append("\n");
             printerArea.setCaretPosition(printerArea.getDocument().getLength());
         });
     }
     
     public void clearPrinter() {
-        SwingUtilities.invokeLater(() -> printerArea.setText(""));
+        SwingUtilities.invokeLater(() -> {
+            printerArea.setText("");
+            printerBuffer.setLength(0);
+        });
     }
 
     public void printToConsole(String text) {
         if (text == null) return;
         SwingUtilities.invokeLater(() -> {
-            printerArea.append(text);
+            if (text.startsWith("[RAW]")) {
+                printerArea.append(text.substring(5));
+                printerBuffer.append(text.substring(5));
+            } else {
+                printerArea.append(text);
+                printerBuffer.append(text);
+            }
             printerArea.setCaretPosition(printerArea.getDocument().getLength());
         });
+    }
+    
+    public int readFromConsole() {
+        if (consoleInputQueue.isEmpty()) {
+            // Check if we've already consumed all expected inputs for Program1
+            if (inputsConsumedThisRun >= 21 && !program2Mode) {
+                // All inputs consumed, don't ask for more
+                return -1;
+            }
+            
+            // No input available: announce once per wait state
+            if (!waitingForInputAnnounced && !program2Mode) {
+                int nextIdx = inputsConsumedThisRun + 1;
+                printToConsole(String.format("\nWaiting for input #%d (enter 21 values: 20 list + 1 search)\n", nextIdx));
+                waitingForInputAnnounced = true;
+            } else if (!waitingForInputAnnounced) {
+                waitingForInputAnnounced = true;
+                printToConsole("\nWaiting for input\n");
+            }
+            return -1;
+        }
+        
+        String input = consoleInputQueue.poll();
+        try {
+            int value = Integer.parseInt(input, 10); // Parse as decimal
+            inputsConsumedThisRun++;
+            waitingForInputAnnounced = false;
+            return value;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private void addListeners() {
@@ -487,18 +547,72 @@ public class SimulatorGUI extends JFrame {
     }
 
     private void submitConsoleText() {
-        String text = consoleInputTextField.getText();
-        if (text != null && !text.trim().isEmpty()) {
-            cpu.submitConsoleInput(text + " ");
-            consoleInputTextField.setText("");
-            appendToPrinter("-> " + text); // Echo submitted text
+        String input = consoleInputTextField.getText();
+        if (input == null || input.trim().isEmpty()) {
+            return;
         }
+        
+        // Check queue size limit
+        if (consoleInputQueue.size() >= 21 && !program2Mode) {
+            appendToPrinter("Error: All 21 values already entered (20 list + 1 search). Click Run to execute.");
+            consoleInputTextField.setText("");
+            return;
+        }
+
+        String[] tokens = input.trim().split("[\\s,]+");
+        int sizeBefore = consoleInputQueue.size();
+        int added = 0;
+        int ignoredExtra = 0;
+
+        for (String t : tokens) {
+            if (consoleInputQueue.size() >= 21 && !program2Mode) {
+                ignoredExtra++;
+                continue;
+            }
+            
+            try {
+                // Try parsing as decimal
+                Integer.parseInt(t, 10);
+                consoleInputQueue.offer(t);
+                added++;
+            } catch (NumberFormatException ex) {
+                // Not a number - treat as text and add character by character
+                for (char ch : t.toCharArray()) {
+                    consoleInputQueue.offer(String.valueOf((int) ch));
+                    added++;
+                }
+                consoleInputQueue.offer("0"); // Null terminator
+                added++;
+            }
+        }
+
+        if (added == 1) {
+            appendToPrinter("Input queued: " + tokens[0]);
+        } else if (added > 1) {
+            appendToPrinter(String.format("Bulk input queued: %d values", added));
+        }
+        
+        if (ignoredExtra > 0) {
+            appendToPrinter(String.format("Note: Ignored %d extra value(s) beyond 21 total inputs", ignoredExtra));
+        }
+
+        int sizeAfter = consoleInputQueue.size();
+        if (!program2Mode) {
+            if (sizeBefore < 20 && sizeAfter >= 20 && sizeAfter < 21) {
+                appendToPrinter(">>> 20 values entered. Now enter the SEARCH VALUE <<<");
+            }
+            if (sizeAfter >= 21) {
+                appendToPrinter(">>> All 21 values entered. Click Run to execute. <<<");
+            }
+        }
+
+        consoleInputTextField.setText("");
     }
 
     private void updateBinaryDisplayFromOctalInput() {
         try {
-            short value = cpu.getUtils().octalToShort(octalInputField.getText());
-            binaryDisplayField.setText(cpu.getUtils().shortToBinary(value, 16));
+            int value = Integer.parseInt(octalInputField.getText(), 8);
+            binaryDisplayField.setText(String.format("%16s", Integer.toBinaryString(value & 0xFFFF)).replace(' ', '0'));
         } catch (NumberFormatException ex) {
             binaryDisplayField.setText("Invalid Octal Input");
         }
@@ -508,20 +622,60 @@ public class SimulatorGUI extends JFrame {
         try {
             System.out.println("\n=== Button Press: " + command + " ===");
             
-            short octalValue = 0;
+            int octalValue = 0;
             if (command.equals("Load") || command.equals("Load+") || command.equals("Store") || command.equals("Store+")) {
-                 octalValue = cpu.getUtils().octalToShort(octalInputField.getText());
+                 octalValue = Integer.parseInt(octalInputField.getText(), 8);
                  System.out.printf("Octal Input Value: %06o\n", octalValue);
             }
             
             switch (command) {
-                case "Load" -> cpu.load(octalValue);
-                case "Load+" -> cpu.loadPlus(octalValue);
-                case "Store" -> cpu.store(octalValue);
-                case "Store+" -> cpu.storePlus(octalValue);
-                case "Run" -> cpu.runProgram();
-                case "Step" -> cpu.singleStep();
-                case "Halt" -> cpu.halt();
+                case "Load" -> {
+                    cpu.setMAR(octalValue);
+                    cpu.manual_load();
+                    updateAllDisplays();
+                }
+                case "Load+" -> {
+                    cpu.setMAR(octalValue);
+                    cpu.manual_load_plus();
+                    updateAllDisplays();
+                }
+                case "Store" -> {
+                    cpu.setMAR(octalValue);
+                    cpu.manual_store();
+                    updateAllDisplays();
+                }
+                case "Store+" -> {
+                    cpu.setMAR(octalValue);
+                    cpu.manual_store_plus();
+                    updateAllDisplays();
+                }
+                case "Run" -> {
+                    inputsConsumedThisRun = 0;
+                    waitingForInputAnnounced = false;
+                    summaryPrinted = false;
+                    
+                    // If previous program halted, restart from program entry without requiring IPL
+                    if (cpu.isHalted()) {
+                        cpu.reset();
+                        cpu.setPC(64); // 0o100
+                        if (!program2Mode) {
+                            appendToPrinter("Restarting program from 0o100. Enter 21 inputs if not already queued, then wait for output.");
+                        } else {
+                            appendToPrinter("Restarting program from 0o100.");
+                        }
+                    }
+                    
+                    cpu.unhalt();
+                    cpu.run(this::updateAllDisplays);
+                }
+                case "Step" -> {
+                    cpu.step();
+                    updateAllDisplays();
+                }
+                case "Halt" -> {
+                    cpu.halt();
+                    updateAllDisplays();
+                }
                 case "IPL" -> loadProgramFromFile();
             }
         } catch (NumberFormatException ex) {
@@ -529,9 +683,8 @@ public class SimulatorGUI extends JFrame {
             showError("Invalid Octal Input", "Please enter a valid octal string (0-7, up to 6 digits).");
         }
     }
-
+    
     private void loadProgramFromFile() {
-        // Prefer starting in the simulator folder and preselect the default Program1.txt
         File cwd = new File(System.getProperty("user.dir"));
         File simDir = new File(cwd, "CS6461-Computer-Architecture-Project" + File.separator + "simulator");
         File defaultProgram = new File(simDir, "Program1.txt");
@@ -543,9 +696,43 @@ public class SimulatorGUI extends JFrame {
         fileChooser.setDialogTitle("Select Program File for IPL");
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             File programFile = fileChooser.getSelectedFile();
-            cpu.ipl(programFile);
+            try {
+                // Detect Program2 mode
+                String fileName = programFile.getName();
+                if (fileName.contains("Program2") || fileName.contains("program2")) {
+                    program2Mode = true;
+                } else {
+                    program2Mode = false;
+                }
+                
+                resetMachine();
+                memory.loadProgramFromFile(programFile.getAbsolutePath());
+                cpu.setPC(64); // 0o100 - program entry point
+                updateAllDisplays();
+                
+                appendToPrinter("Program loaded successfully: " + programFile.getName());
+                appendToPrinter("PC set to 0o100 (program start address)");
+                
+                if (!program2Mode) {
+                    appendToPrinter("Ready: Enter 20 list values, then enter the SEARCH value and click Run.");
+                }
+            } catch (IOException ex) {
+                showError("Load Error", "Could not load program: " + ex.getMessage());
+            }
         }
     }
+    
+    private void resetMachine() {
+        memory.reset();
+        cpu.reset();
+        consoleInputQueue.clear();
+        inputsConsumedThisRun = 0;
+        waitingForInputAnnounced = false;
+        summaryPrinted = false;
+        printerBuffer.setLength(0);
+    }
+
+    
     
     public void updateAllDisplays() {
         updateRegisters();
@@ -553,19 +740,69 @@ public class SimulatorGUI extends JFrame {
     }
 
     public void updateRegisters() {
-        for (int i = 0; i < 4; i++) gprTextFields[i].setText(cpu.getUtils().shortToOctal(cpu.getGPR(i), 6));
-        for (int i = 0; i < 3; i++) ixrTextFields[i].setText(cpu.getUtils().shortToOctal(cpu.getIXR(i + 1), 6));
-        pcTextField.setText(cpu.getUtils().shortToOctal(cpu.getPC(), 4));
-        marTextField.setText(cpu.getUtils().shortToOctal(cpu.getMAR(), 4));
-        mbrTextField.setText(cpu.getUtils().shortToOctal(cpu.getMBR(), 6));
-        irTextField.setText(cpu.getUtils().shortToOctal(cpu.getIR(), 6));
-        ccTextField.setText(cpu.getUtils().shortToBinary(cpu.getCC(), 4));
-        mfrTextField.setText(cpu.getUtils().shortToBinary(cpu.getMFR(), 4));
+        for (int i = 0; i < 4; i++) {
+            gprTextFields[i].setText(String.format("%06o", cpu.getGPR(i) & 0xFFFF));
+        }
+        for (int i = 0; i < 3; i++) {
+            ixrTextFields[i].setText(String.format("%06o", cpu.getIXR(i + 1) & 0xFFFF));
+        }
+        pcTextField.setText(String.format("%04o", cpu.getPC() & 0xFFF));
+        marTextField.setText(String.format("%04o", cpu.getMAR() & 0xFFF));
+        mbrTextField.setText(String.format("%06o", cpu.getMBR() & 0xFFFF));
+        irTextField.setText(String.format("%06o", cpu.getIR() & 0xFFFF));
+        ccTextField.setText(String.format("%4s", Integer.toBinaryString(cpu.getCC() & 0xF)).replace(' ', '0'));
+        mfrTextField.setText(String.format("%4s", Integer.toBinaryString(cpu.getMFR() & 0xF)).replace(' ', '0'));
     }
 
     public void updateMemoryView() {
-        cacheContentArea.setText(cpu.getFormattedCache());
+        cacheContentArea.setText(getFormattedCache());
         cacheContentArea.setCaretPosition(0);
+        
+        // When the program halts, append a clear, labeled summary using the last two numeric OUTs
+        if (cpu.isHalted() && !summaryPrinted && !program2Mode) {
+            try {
+                // Find the last two numeric lines printed by the program (OUT outputs)
+                String[] lines = printerBuffer.toString().split("\n");
+                Integer last = null, secondLast = null;
+                for (int i = lines.length - 1; i >= 0; i--) {
+                    String line = lines[i].trim();
+                    if (line.matches("-?\\d+")) {
+                        if (last == null) {
+                            last = Integer.parseInt(line);
+                        } else {
+                            secondLast = Integer.parseInt(line);
+                            break;
+                        }
+                    }
+                }
+                if (last != null && secondLast != null) {
+                    int searchVal = secondLast; // Program prints: 20 list, then search, then closest
+                    int closestVal = last;      // last is closest
+                    appendToPrinter("Search number, " + searchVal);
+                    appendToPrinter("Closest number, " + closestVal);
+                }
+            } catch (Exception ignore) {
+                // Silently ignore parsing errors
+            }
+            summaryPrinted = true;
+        }
+    }
+    
+    private String getFormattedCache() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Cache Contents (FIFO, Write-Through):\n");
+        sb.append("=====================================\n");
+        Cache.CacheLine[] lines = memory.getCache().getLines();
+        for (int i = 0; i < Cache.CACHE_SIZE; i++) {
+            Cache.CacheLine line = lines[i];
+            if (line.isValid()) {
+                sb.append(String.format("Line %2d: Addr=%04o Data=%06o\n", 
+                    i, line.getTag(), line.getData() & 0xFFFF));
+            } else {
+                sb.append(String.format("Line %2d: [Empty]\n", i));
+            }
+        }
+        return sb.toString();
     }
 
     public void showError(String title, String message) {
@@ -579,13 +816,14 @@ public class SimulatorGUI extends JFrame {
                 showError("Input Error", "Octal Input field cannot be empty.");
                 return;
             }
-            short value = cpu.getUtils().octalToShort(octalString);
+            int value = Integer.parseInt(octalString, 8);
 
-            System.out.printf("Loading value %06o into %s%s\n", value, registerName, (registerName.equals("IXR") ? index+1 : (registerName.equals("GPR") ? index : "")));
+            System.out.printf("Loading value %06o into %s%s\n", value, registerName, 
+                (registerName.equals("IXR") ? index+1 : (registerName.equals("GPR") ? index : "")));
 
             switch (registerName) {
                 case "GPR" -> cpu.setGPR(index, value);
-                case "IXR" -> cpu.setIXR(index + 1, value); // IXRs are 1-based in CPU
+                case "IXR" -> cpu.setIXR(index + 1, value);
                 case "PC" -> cpu.setPC(value);
                 case "MAR" -> cpu.setMAR(value);
                 case "MBR" -> cpu.setMBR(value);
